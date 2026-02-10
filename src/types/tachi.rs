@@ -55,6 +55,8 @@ pub struct ImportScore {
     pub judgements: Judgements,
     #[serde(rename = "hitMeta")]
     pub hit_meta: HitMeta,
+    #[serde(skip_serializing_if = "Optional::is_default")]
+    pub optional: Optional,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, FromPrimitive, Serialize, Deserialize)]
@@ -131,4 +133,37 @@ pub struct HitMeta {
     pub max_combo: u32,
     #[serde(rename = "exScore")]
     pub ex_score: u32,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Optional {
+    pub flare: Flare,
+}
+
+impl Optional {
+    pub fn is_default(opt: &Optional) -> bool {
+        opt.flare == Flare::None
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, FromPrimitive, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum Flare {
+    #[num_enum(default)]
+    None = 0,
+    I = 1,
+    II = 2,
+    III = 3,
+    IV = 4,
+    V = 5,
+    VI = 6,
+    VII = 7,
+    VIII = 8,
+    IX = 9,
+}
+
+impl Default for Flare {
+    fn default() -> Self {
+        Flare::None
+    }
 }

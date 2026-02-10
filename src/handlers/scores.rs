@@ -1,19 +1,11 @@
 use anyhow::{Ok, Result};
 use crate::{helpers, CONFIGURATION, TACHI_IMPORT_URL};
-use crate::types::game::GameScores;
-use crate::types::tachi::{Difficulty, HitMeta, Import, ImportMeta, ImportScore, Judgements, Playtype, TachiLamp};
+use crate::types::game::{PlayerData2Data, PlayData3Data};
+use crate::types::tachi::{Difficulty, HitMeta, Import, ImportMeta, ImportScore, Judgements, Playtype, TachiLamp, Optional, Flare};
 use log::{debug, info};
+use either::Either;
 
-pub fn process_scores(scores: GameScores) -> Result<()> {
-    if scores.isgameover {
-        debug!("Aborting: isgameover is true");
-        return Ok(());
-    }
-
-    if scores.ref_id.starts_with("X000") {
-        info!("Guest play, skipping score(s) submission");
-        return Ok(());
-    }
+pub fn process_scores(scores: Either<PlayerData2Data, PlayData3Data>) -> Result<()> {
 
     let card = if let Some(card) = helpers::get_current_card_id() {
         if !CONFIGURATION.cards.whitelist.is_empty()
@@ -32,50 +24,110 @@ pub fn process_scores(scores: GameScores) -> Result<()> {
         return Ok(());
     };
 
-    let note = if let Some(highest_stage) = scores.note.iter()
-        .filter(|n| n.stagenum != 0)
-        .max_by_key(|n| n.stagenum)
-        .cloned()
-    {
-        debug!("Selected note with highest stagenum != 0: {:#?}", highest_stage);
-        highest_stage
-    } else {
-        debug!("No valid note with stagenum != 0 found, skipping");
-        return Ok(());
-    };
+    let (import_score, import_meta) = match &scores {
+        Either::Left(scores) => {
+            if scores.isgameover {
+                debug!("Aborting: isgameover is true");
+                return Ok(());
+            }
 
-    if note.playstyle == 2 {
-        info!("Versus play, skipping score(s) submission");
-        return Ok(());
-    }
+            if scores.ref_id.starts_with("X000") {
+                info!("Guest play, skipping score(s) submission");
+                return Ok(());
+            }
 
-    let import_score = ImportScore {
-        score: note.score,
-        lamp: TachiLamp::from(note.clearkind),
-        match_type: "inGameID".to_string(),
-        identifier: note.mcode.to_string(),
-        difficulty: Difficulty::from(note.notetype),
-        time_achieved: note.endtime,
-        judgements: Judgements {
-            marvelous: note.judge_marvelous,
-            perfect: note.judge_perfect,
-            great: note.judge_great,
-            good: note.judge_good,
-            miss: note.judge_miss,
-            ok: note.judge_ok,
-        },
-        hit_meta: HitMeta {
-            fast: note.fastcount,
-            slow: note.slowcount,
-            max_combo: note.maxcombo,
-            ex_score: note.ex_score,
-        },
-    };
+            let highest_stage = scores.note.iter()
+                .filter(|n| n.stagenum != 0)
+                .max_by_key(|n| n.stagenum)
+                .cloned();
 
-    let import_meta = ImportMeta {
-        game: "ddr".to_string(),
-        play_type: Playtype::from(note.playstyle),
-        service: "Takure".to_string(),
+            match highest_stage {
+                Some(highest_stage) => {
+                    debug!("Selected note with highest stagenum != 0: {:#?}", highest_stage);
+
+                    let import_score = ImportScore {
+                        score: highest_stage.score,
+                        lamp: TachiLamp::from(highest_stage.clearkind),
+                        match_type: "inGameID".to_string(),
+                        identifier: highest_stage.mcode.to_string(),
+                        difficulty: Difficulty::from(highest_stage.notetype),
+                        time_achieved: highest_stage.endtime,
+                        judgements: Judgements {
+                            marvelous: highest_stage.judge_marvelous,
+                            perfect: highest_stage.judge_perfect,
+                            great: highest_stage.judge_great,
+                            good: highest_stage.judge_good,
+                            miss: highest_stage.judge_miss,
+                            ok: highest_stage.judge_ok,
+                        },
+                        hit_meta: HitMeta {
+                            fast: highest_stage.fastcount,
+                            slow: highest_stage.slowcount,
+                            max_combo: highest_stage.maxcombo,
+                            ex_score: highest_stage.ex_score,
+                        },
+                        optional: Optional::default(),
+                    };
+
+                    let import_meta = ImportMeta {
+                        game: "ddr".to_string(),
+                        play_type: Playtype::from(highest_stage.playstyle),
+                        service: "Takure".to_string(),
+                    };
+
+                    (import_score, import_meta)
+                }
+                None => {
+                    debug!("No valid note with stagenum != 0 found, skipping");
+                    return Ok(());
+                }
+            }
+        }
+        Either::Right(scores) => {
+            if scores.ref_id.starts_with("X000") {
+                info!("Guest play, skipping score(s) submission");
+                return Ok(());
+            }
+
+            let result: crate::types::game::Result =
+                serde_json::from_value(scores.result.clone())?;
+
+            let import_score = ImportScore {
+                score: result.score,
+                lamp: TachiLamp::from(result.clearkind),
+                match_type: "inGameID".to_string(),
+                identifier: result.mcode.to_string(),
+                difficulty: Difficulty::from(result.difficulty),
+                time_achieved: result.playtime,
+                judgements: Judgements {
+                    marvelous: result.judge_marv,
+                    perfect: result.judge_perf,
+                    great: result.judge_great,
+                    good: result.judge_good,
+                    miss: result.judge_miss,
+                    ok: result.judge_ok,
+                },
+                hit_meta: HitMeta {
+                    fast: result.fastcount,
+                    slow: result.slowcount,
+                    max_combo: result.maxcombo,
+                    ex_score: result.ex_score,
+                },
+                optional: if result.flare_force == 0 {
+                    Optional::default()
+                } else {
+                    Optional { flare: Flare::from(result.flare_force) }
+                },
+            };
+
+            let import_meta = ImportMeta {
+                game: "ddr".to_string(),
+                play_type: Playtype::from(result.style),
+                service: "Takure".to_string(),
+            };
+
+            (import_score, import_meta)
+        }
     };
 
     let import = Import {
