@@ -21,7 +21,9 @@ pub struct PlayerData2Data {
     pub mode: String,
     #[serde(rename = "refid")]
     pub ref_id: String,
+    #[serde(default)]
     pub isgameover: bool,
+    #[serde(default)]
     pub note: Vec<Note>,
 }
 
