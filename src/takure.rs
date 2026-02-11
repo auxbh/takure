@@ -2,7 +2,7 @@ use anyhow::Result;
 use crate::{helpers, CONFIGURATION, TACHI_STATUS_URL};
 use crate::handlers::scores::process_scores;
 use crate::sys::{property_clear_error, property_mem_write, property_node_name, property_node_refer, property_query_size, property_search, property_set_flag, NodeType};
-use crate::types::game::Property;
+use crate::types::game::{Property2, Property3};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 use log::{debug, error, info, warn};
@@ -26,7 +26,7 @@ pub fn hook_init(ea3_node: *const ()) -> Result<()> {
             Some((model, dest, spec, revision, ext))
         })
     {
-        if model != "MDX" || revision == "O" || revision == "X" || ext < 2022022801 || ext > 2024040200 {
+        if model != "MDX" || revision == "O" || revision == "X" || ext < 2022022801 {
             error!(
                 "Unsupported model/revision/ext '{}:{}:{}:{}:{}', hook will not be enabled",
                 model, dest, spec, revision, ext
@@ -84,12 +84,20 @@ pub unsafe extern "C" fn property_destroy_hook(property: *mut ()) -> i32 {
         return 0;
     }
 
-    let node = property_search(property, std::ptr::null(), b"/call/playerdata_2\0".as_ptr());
-    let node = if node.is_null() {
-        property_search(property, std::ptr::null(), b"/call/cardmng\0".as_ptr())
-    } else {
-        node
+    let node = {
+        let p2 = property_search(property, std::ptr::null(), b"/call/playerdata_2\0".as_ptr());
+        if !p2.is_null() {
+            p2
+        } else {
+            let p3 = property_search(property, std::ptr::null(), b"/call/playdata_3\0".as_ptr());
+            if !p3.is_null() {
+                p3
+            } else {
+                property_search(property, std::ptr::null(), b"/call/cardmng\0".as_ptr())
+            }
+        }
     };
+    
     if node.is_null() {
         property_clear_error(property);
         return call_original!(property);
@@ -110,7 +118,7 @@ pub unsafe extern "C" fn property_destroy_hook(property: *mut ()) -> i32 {
         result.unwrap().replace('\0', "")
     };
 
-    if name != "playerdata_2" && name != "cardmng" {
+    if name != "playerdata_2" && name != "playdata_3" && name != "cardmng" {
         return call_original!(property);
     }
 
@@ -174,7 +182,7 @@ pub unsafe extern "C" fn property_destroy_hook(property: *mut ()) -> i32 {
         return call_original!(property);
     }
 
-    if method != "usergamedata_advanced" {
+    if method != "usergamedata_advanced" && method != "playerdata_save" {
         return call_original!(property);
     }
 
@@ -207,7 +215,7 @@ pub unsafe extern "C" fn property_destroy_hook(property: *mut ()) -> i32 {
 
     debug!("Processing property: {}", property_str);
     if let Err(err) = match method.as_str() {
-        "usergamedata_advanced" => serde_json::from_str::<Property>(property_str)
+        "usergamedata_advanced" => serde_json::from_str::<Property2>(property_str)
         .map_err(|err| anyhow::anyhow!("Could not parse property: {:#}", err))
         .and_then(|prop| {
             debug!("Mode: {:#?}", prop.call.playerdata_2.data.mode);
@@ -215,7 +223,17 @@ pub unsafe extern "C" fn property_destroy_hook(property: *mut ()) -> i32 {
                 return Ok(());
             }
             debug!("Filtered Property: {:#?}", prop);
-            process_scores(prop.call.playerdata_2.data)
+            process_scores(either::Left(prop.call.playerdata_2.data))
+        }),
+        "playerdata_save" => serde_json::from_str::<Property3>(property_str)
+        .map_err(|err| anyhow::anyhow!("Could not parse property: {:#}", err))
+        .and_then(|prop| {
+            debug!("Savekind: {:#?}", prop.call.playdata_3.data.savekind);
+            if prop.call.playdata_3.data.savekind != 2 {
+                return Ok(());
+            }
+            debug!("Filtered Property: {:#?}", prop);
+            process_scores(either::Right(prop.call.playdata_3.data))
         }),
     _ => unreachable!(),
     } {
