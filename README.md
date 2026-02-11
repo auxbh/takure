@@ -11,8 +11,7 @@ Credits to [adamaq01](https://github.com/adamaq01) for creating Mikado and helpi
 
 ## Support
 
-Takure supports both 32 and 64 bit versions of DDR A3.  
-Support for DDR WORLD is in progress.
+Takure supports both 32 and 64 bit versions of DDR A3 and DDR WORLD.
 
 Score submission only works with Single and Double style. Versus play will not submit scores.
 
