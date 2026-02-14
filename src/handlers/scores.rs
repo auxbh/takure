@@ -24,6 +24,11 @@ pub fn process_scores(scores: Either<PlayerData2Data, PlayData3Data>) -> Result<
         return Ok(());
     };
 
+    let time_achieved = std::time::UNIX_EPOCH
+        .elapsed()
+        .map(|duration| duration.as_millis())
+        .map_err(|err| anyhow::anyhow!("Could not get time from System {:#}", err))?;
+
     let (import_score, import_meta) = match &scores {
         Either::Left(scores) => {
             if scores.isgameover {
@@ -51,7 +56,7 @@ pub fn process_scores(scores: Either<PlayerData2Data, PlayData3Data>) -> Result<
                         match_type: "inGameID".to_string(),
                         identifier: highest_stage.mcode.to_string(),
                         difficulty: Difficulty::from(highest_stage.notetype),
-                        time_achieved: highest_stage.endtime,
+                        time_achieved,
                         judgements: Judgements {
                             marvelous: highest_stage.judge_marvelous,
                             perfect: highest_stage.judge_perfect,
@@ -98,7 +103,7 @@ pub fn process_scores(scores: Either<PlayerData2Data, PlayData3Data>) -> Result<
                 match_type: "inGameID".to_string(),
                 identifier: result.mcode.to_string(),
                 difficulty: Difficulty::from(result.difficulty),
-                time_achieved: result.playtime,
+                time_achieved,
                 judgements: Judgements {
                     marvelous: result.judge_marv,
                     perfect: result.judge_perf,

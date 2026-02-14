@@ -45,7 +45,6 @@ pub struct Note {
     pub judge_good: u32,
     pub judge_miss: u32,
     pub judge_ok: u32,
-    pub endtime: u128,
     pub playstyle: u8,
 }
 
@@ -91,7 +90,6 @@ pub struct Result {
     pub judge_good: u32,
     pub judge_miss: u32,
     pub judge_ok: u32,
-    pub playtime: u128,
     pub style: u8,
     pub flare_force: u8,
 }
