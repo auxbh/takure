@@ -91,5 +91,5 @@ pub struct Result {
     pub judge_miss: u32,
     pub judge_ok: u32,
     pub style: u8,
-    pub flare_force: u8,
+    pub flare_force: i8,
 }

@@ -53,9 +53,6 @@ pub struct ImportScore {
     #[serde(rename = "timeAchieved")]
     pub time_achieved: u128,
     pub judgements: Judgements,
-    #[serde(rename = "hitMeta")]
-    pub hit_meta: HitMeta,
-    #[serde(skip_serializing_if = "Optional::is_default")]
     pub optional: Optional,
 }
 
@@ -137,13 +134,10 @@ pub struct HitMeta {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Optional {
+    #[serde(flatten)]
+    pub hit_meta: HitMeta,
+    #[serde(skip_serializing_if = "Flare::is_none")]
     pub flare: Flare,
-}
-
-impl Optional {
-    pub fn is_default(opt: &Optional) -> bool {
-        opt.flare == Flare::None
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, FromPrimitive, Serialize, Deserialize)]
@@ -165,5 +159,11 @@ pub enum Flare {
 impl Default for Flare {
     fn default() -> Self {
         Flare::None
+    }
+}
+
+impl Flare {
+    pub fn is_none(flare: &Flare) -> bool {
+        *flare == Flare::None
     }
 }

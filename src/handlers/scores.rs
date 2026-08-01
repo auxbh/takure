@@ -65,13 +65,15 @@ pub fn process_scores(scores: Either<PlayerData2Data, PlayData3Data>) -> Result<
                             miss: highest_stage.judge_miss,
                             ok: highest_stage.judge_ok,
                         },
-                        hit_meta: HitMeta {
-                            fast: highest_stage.fastcount,
-                            slow: highest_stage.slowcount,
-                            max_combo: highest_stage.maxcombo,
-                            ex_score: highest_stage.ex_score,
+                        optional: Optional {
+                            hit_meta: HitMeta {
+                                fast: highest_stage.fastcount,
+                                slow: highest_stage.slowcount,
+                                max_combo: highest_stage.maxcombo,
+                                ex_score: highest_stage.ex_score,
+                            },
+                            flare: Flare::None,
                         },
-                        optional: Optional::default(),
                     };
 
                     let import_meta = ImportMeta {
@@ -112,16 +114,18 @@ pub fn process_scores(scores: Either<PlayerData2Data, PlayData3Data>) -> Result<
                     miss: result.judge_miss,
                     ok: result.judge_ok,
                 },
-                hit_meta: HitMeta {
-                    fast: result.fastcount,
-                    slow: result.slowcount,
-                    max_combo: result.maxcombo,
-                    ex_score: result.ex_score,
-                },
-                optional: if result.flare_force == 0 {
-                    Optional::default()
-                } else {
-                    Optional { flare: Flare::from(result.flare_force) }
+                optional: Optional {
+                    hit_meta: HitMeta {
+                        fast: result.fastcount,
+                        slow: result.slowcount,
+                        max_combo: result.maxcombo,
+                        ex_score: result.ex_score,
+                    },
+                    flare: if result.flare_force <= 0 {
+                        Flare::None
+                    } else {
+                        Flare::from(result.flare_force as u8)
+                    },
                 },
             };
 
