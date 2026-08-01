@@ -141,7 +141,7 @@ pub fn process_scores(scores: Either<PlayerData2Data, PlayData3Data>) -> Result<
     };
 
     if cfg!(debug_assertions) {
-        debug!("Tachi API request data: {:#?}", import);
+        debug!("Tachi API request data: {}", serde_json::to_string_pretty(&import).unwrap_or_else(|err| format!("Failed to serialize: {err}")));
     } else {
         helpers::call_tachi("POST", TACHI_IMPORT_URL.as_str(), Some(import))?;
     }
