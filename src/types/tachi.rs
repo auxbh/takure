@@ -154,6 +154,7 @@ pub enum Flare {
     VII = 7,
     VIII = 8,
     IX = 9,
+    EX = 10,
 }
 
 impl Default for Flare {
