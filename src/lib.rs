@@ -86,15 +86,38 @@ fn init_logger() {
 }
 
 fn print_infos() {
-    info!(
-        "Starting Takure v{}-{} by auxbh",
-        env!("CARGO_PKG_VERSION"),
-        option_env!("VERGEN_GIT_DESCRIBE").unwrap_or("unknown")
-    );
+    let describe = option_env!("VERGEN_GIT_DESCRIBE").unwrap_or("unknown");
+    if describe.starts_with('v') {
+        info!("Starting Takure {} by auxbh", describe);
+    } else {
+        info!("Starting Takure v{}-{} by auxbh", env!("CARGO_PKG_VERSION"), describe);
+    }
 
     if let Some(build_date) = option_env!("VERGEN_BUILD_DATE") {
         info!("Build date: {}", build_date);
     }
+}
+
+fn check_for_update() -> anyhow::Result<()> {
+    let describe = option_env!("VERGEN_GIT_DESCRIBE").unwrap_or("unknown");
+    if describe.contains('-') {
+        return Ok(());
+    }
+
+    let latest_tag = helpers::request_agent()
+        .get("https://api.github.com/repos/auxbh/takure/releases/latest")
+        .call()?
+        .into_json::<serde_json::Value>()?
+        .get("tag_name")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+        .ok_or(anyhow::anyhow!("Could not get latest release tag"))?;
+
+    if describe != latest_tag && !cfg!(debug_assertions) {
+        info!("A newer version of Takure is available at https://github.com/auxbh/takure/releases/latest");
+    }
+
+    Ok(())
 }
 
 #[cfg_attr(target_arch = "x86", crochet::hook("libavs-win32-ea3.dll", "XE592acd00008c"))]
@@ -115,6 +138,9 @@ extern "system" fn DllMain(dll_module: HINSTANCE, call_reason: DWORD, reserved: 
             unsafe { AllocConsole() };
             init_logger();
             print_infos();
+            if let Err(err) = check_for_update() {
+                error!("Unable to get update informations {:#}", err);
+            }
 
             if let Err(err) = crochet::enable!(avs_ea3_boot_startup_hook) {
                 error!("{:#}", err);
