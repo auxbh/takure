@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: windows-latest
+    name: Build (${{ matrix.name }})
+
+    strategy:
+      matrix:
+        include:
+          - name: win-32
+            target: i686-pc-windows-msvc
+            artifact_name: takure_32
+          - name: win-64
+            target: x86_64-pc-windows-msvc
+            artifact_name: takure_64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Add build target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Copy .toml file
+        run: cp takure.toml target/${{ matrix.target }}/release/
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            target/${{ matrix.target }}/release/takure.dll
+            target/${{ matrix.target }}/release/takure.toml
+
+  release:
+    needs: build
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download win-32 build
+        uses: actions/download-artifact@v8
+        with:
+          name: takure_32
+          path: artifacts/takure_32
+
+      - name: Download win-64 build
+        uses: actions/download-artifact@v8
+        with:
+          name: takure_64
+          path: artifacts/takure_64
+
+      - name: Zip builds
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts/takure_32/* -DestinationPath takure_32.zip
+          Compress-Archive -Path artifacts/takure_64/* -DestinationPath takure_64.zip
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            takure_32.zip
+            takure_64.zip
+          generate_release_notes: true
