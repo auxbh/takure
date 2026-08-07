@@ -81,4 +81,3 @@ jobs:
           files: |
             takure_32.zip
             takure_64.zip
-          generate_release_notes: true
