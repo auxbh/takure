@@ -7,5 +7,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .git_sha(false)
         .build_date()
         .emit()?;
+    winresource::WindowsResource::new().compile()?;
     Ok(())
 }
